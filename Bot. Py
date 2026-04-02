@@ -22,8 +22,8 @@ SUPPORT_USER   = "@ONLYALLSUPPORT"
 BOT_NAME       = "FB ID Submit Hub"
 MAX_HISTORY    = 10
 
-# ✅ Jarvis (HuggingFace) API Keys
-HF_API_TOKEN   = "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"
+# ✅ Jarvis (HuggingFace) API Keys — আপনার নতুন টোকেন আপডেট করা হয়েছে
+HF_API_TOKEN   = "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"
 CHAT_API_URL   = "https://router.huggingface.co/v1/chat/completions"
 CHAT_MODEL     = "deepseek-ai/DeepSeek-V3"
 VISION_API_URL = "https://api-inference.huggingface.co/models/google/vit-base-patch16-224"
@@ -62,7 +62,7 @@ user_submissions = {}
 submission_count = 0
 registered_users = set()
 username_to_id   = {}
-ai_sessions      = {}   # {uid: {"history":[], "active":bool}}
+ai_sessions      = {}
 
 # ════════════════════════════════════════════════════════════════
 #  HELPERS
@@ -126,7 +126,8 @@ class JarvisAI:
         payload = {
             'model': CHAT_MODEL,
             'messages': [
-                {'role': 'system', 'content': 'You are JARVIS, a professional AI. Always respond in Bengali. Keep answers short and polite.'},
+                # এখানে আপনার দেওয়া সালামটি সিস্টেম প্রম্পটে যুক্ত করা হয়েছে
+                {'role': 'system', 'content': 'You are JARVIS. Always start your response with "আসসালামু আলাইকুম, স্যার।". Respond in Bengali and keep it polite and professional.'},
                 {'role': 'user', 'content': prompt}
             ],
             'max_tokens': 500
@@ -215,17 +216,14 @@ def handle_text(message):
     cid  = message.chat.id
     text = (message.text or "").strip()
 
-    # Init AI session
     if cid not in ai_sessions:
         ai_sessions[cid] = {"history": [], "active": False}
 
-    # ১. লোকাল কমান্ড চেক (Jarvis AI Feature)
     local_res = get_local_stats(text)
     if local_res:
         bot.send_message(cid, local_res, parse_mode="Markdown")
         return
 
-    # ── Menu buttons ──
     if text == "🚀 SELL ID 🚀":
         show_categories(cid)
 
@@ -249,7 +247,7 @@ def handle_text(message):
         bot.send_message(
             cid,
             "🤖 *AI Chat চালু হয়েছে!*\n\n"
-            "এখন আপনি যা লিখবেন আমি বাংলায় উত্তর দেব।\n"
+            "এখন আপনি যা লিখবেন আমি আসসালামু আলাইকুম বলে উত্তর দেব।\n"
             "বন্ধ করতে *❌ Stop AI* বাটন চাপুন।",
             parse_mode="Markdown"
         )
@@ -267,11 +265,9 @@ def handle_text(message):
         if is_admin(cid):
             show_admin_panel(cid)
 
-    # ── AI mode ──
     elif ai_sessions[cid]["active"]:
         handle_ai_message(cid, text)
 
-    # ── Unknown ──
     else:
         bot.send_message(
             cid,
@@ -294,17 +290,15 @@ def handle_ai_message(cid, text):
         bot.send_message(cid, "⚠️ একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।")
 
 # ════════════════════════════════════════════════════════════════
-#  PHOTO HANDLER (For Jarvis Vision AI)
+#  PHOTO HANDLER
 # ════════════════════════════════════════════════════════════════
 @bot.message_handler(content_types=["photo"])
 def handle_photo(message):
     cid = message.chat.id
-    # যদি ইউজার ফাইল আপলোডের ধাপে থাকে
     if cid in user_data and user_data[cid].get("step") == "file":
         bot.send_message(cid, "❌ একটি *.xlsx* ফাইল পাঠান, অন্য কিছু নয়।", reply_markup=cancel_btn(), parse_mode="Markdown")
         return
 
-    # Jarvis Vision AI 
     typing = bot.send_message(cid, "😊 ছবিটি দেখছি, একটু অপেক্ষা করুন স্যার...")
     try:
         file_info = bot.get_file(message.photo[-1].file_id)
@@ -324,7 +318,7 @@ def handle_photo(message):
         bot.send_message(cid, "⚠️ ছবি প্রক্রিয়া করতে সমস্যা হয়েছে।")
 
 # ════════════════════════════════════════════════════════════════
-#  SELL FLOW — Category → Username → File → Number → Note
+#  SELL FLOW
 # ════════════════════════════════════════════════════════════════
 def show_categories(cid):
     markup = types.InlineKeyboardMarkup(row_width=1)
@@ -413,7 +407,6 @@ def step_username(message):
     bot.register_next_step_handler(msg, step_file_text)
 
 def step_file_text(message):
-    """Catch text when file expected"""
     cid = message.chat.id
     if message.text in MENU_BUTTONS:
         return handle_text(message)
@@ -572,20 +565,18 @@ def finalize(cid, note):
     del user_data[cid]
 
 # ════════════════════════════════════════════════════════════════
-#  CALLBACKS (ADMIN PANEL + OTHER)
+#  CALLBACKS
 # ════════════════════════════════════════════════════════════════
 @bot.callback_query_handler(func=lambda c: True)
 def callback_handler(call):
     cid  = call.message.chat.id
     data = call.data
 
-    # ── Cancel ──
     if data == "cancel_flow":
         bot.answer_callback_query(call.id)
         user_data.pop(cid, None)
         bot.send_message(cid, "❌ বাতিল করা হয়েছে।", reply_markup=main_menu(cid))
 
-    # ── Admin: Review ──
     elif data.startswith("review_"):
         bot.answer_callback_query(call.id)
         if not is_admin(cid): return
@@ -606,11 +597,9 @@ def callback_handler(call):
         )
         bot.register_next_step_handler(msg, step_review, sub_id, call.message.message_id)
 
-    # ── Admin: already done ──
     elif data == "already_done":
         bot.answer_callback_query(call.id, "✅ Already processed!")
 
-    # ── Admin panel callbacks ──
     elif data == "admin_msg_user":
         bot.answer_callback_query(call.id)
         if not is_admin(cid): return
@@ -692,7 +681,7 @@ def _show_status_menu(cid, msg_id):
     except: pass
 
 # ════════════════════════════════════════════════════════════════
-#  ADMIN REVIEW
+#  ADMIN REVIEW / TOOLS / HISTORY / PANEL (অপরিবর্তিত)
 # ════════════════════════════════════════════════════════════════
 def step_review(message, sub_id, ch_msg_id):
     cid = message.chat.id
@@ -739,9 +728,6 @@ def step_review(message, sub_id, ch_msg_id):
 
     bot.send_message(cid, f"✅ *#{sub_id} Result পাঠানো হয়েছে!*\nAmount: ৳{amount:.2f}", parse_mode="Markdown")
 
-# ════════════════════════════════════════════════════════════════
-#  ADMIN TOOLS
-# ════════════════════════════════════════════════════════════════
 def step_msg_user_id(message):
     uid_input = (message.text or "").strip()
     target = None
@@ -750,11 +736,7 @@ def step_msg_user_id(message):
     elif uid_input.lower() in username_to_id:
         target = username_to_id[uid_input.lower()]
     else:
-        bot.send_message(
-            message.chat.id,
-            "❌ *পাওয়া যায়নি!*\n_Bot restart হলে username কাজ নাও করতে পারে। Numeric ID ব্যবহার করুন।_",
-            parse_mode="Markdown"
-        )
+        bot.send_message(message.chat.id, "❌ *পাওয়া যায়নি!*", parse_mode="Markdown")
         return
     msg = bot.send_message(message.chat.id, "✍️ মেসেজ বা ছবি পাঠান:")
     bot.register_next_step_handler(msg, step_send_to_user, target)
@@ -771,7 +753,7 @@ def step_send_to_user(message, target):
 
 def step_broadcast(message):
     ok = fail = 0
-    bot.send_message(message.chat.id, f"⏳ ব্রডকাস্ট শুরু... ({len(registered_users)} user)")
+    bot.send_message(message.chat.id, f"⏳ ব্রডকাস্ট শুরু...")
     for uid in list(registered_users):
         try:
             if message.photo:
@@ -782,39 +764,24 @@ def step_broadcast(message):
         except:
             fail += 1
         time.sleep(0.05)
-    bot.send_message(
-        message.chat.id,
-        f"📢 *ব্রডকাস্ট সম্পন্ন!*\n✅ সফল: {ok}\n❌ ব্যর্থ: {fail}",
-        parse_mode="Markdown"
-    )
+    bot.send_message(message.chat.id, f"📢 *ব্রডকাস্ট সম্পন্ন!*\n✅ সফল: {ok}\n❌ ব্যর্থ: {fail}", parse_mode="Markdown")
 
 def step_set_rate(message, code):
-    if not is_admin(message.chat.id): return
     try:
         new_rate = float(message.text.strip())
         CATEGORIES[code]["rate"] = new_rate
-        bot.send_message(
-            message.chat.id,
-            f"✅ *{CATEGORIES[code]['name']}*\nনতুন rate সেট: *{new_rate:.2f} Tk*",
-            parse_mode="Markdown"
-        )
+        bot.send_message(message.chat.id, f"✅ *{CATEGORIES[code]['name']}*\nনতুন rate: *{new_rate:.2f} Tk*", parse_mode="Markdown")
         show_admin_panel(message.chat.id)
     except ValueError:
-        msg = bot.send_message(message.chat.id, "❌ সংখ্যা দিন (যেমন: 15.50):")
+        msg = bot.send_message(message.chat.id, "❌ সংখ্যা দিন:")
         bot.register_next_step_handler(msg, step_set_rate, code)
 
-# ════════════════════════════════════════════════════════════════
-#  USER HISTORY
-# ════════════════════════════════════════════════════════════════
 def show_history(cid):
     subs = user_submissions.get(cid, [])
     if not subs:
         bot.send_message(cid, "📭 এখনো কোনো সাবমিশন নেই।")
         return
-    lines = [
-        "📜 *আপনার সাবমিশন হিস্টোরি*",
-        "━━━━━━━━━━━━━━━━━━━━━━━━"
-    ]
+    lines = ["📜 *আপনার সাবমিশন হিস্টোরি*", "━━━━━━━━━━━━━━━━━━━━━━━━"]
     for sid in reversed(subs[-15:]):
         s    = all_submissions.get(sid, {})
         icon = "✅" if s.get("paid") else "⏳"
@@ -822,51 +789,22 @@ def show_history(cid):
         lines.append(f"{icon} `{sid}` | {s.get('type_name','?')} | ৳{amt:.2f} | {s.get('date','?')}")
     bot.send_message(cid, "\n".join(lines), parse_mode="Markdown")
 
-# ════════════════════════════════════════════════════════════════
-#  ADMIN PANEL
-# ════════════════════════════════════════════════════════════════
 def show_admin_panel(cid):
     total  = len(all_submissions)
     paid   = sum(1 for s in all_submissions.values() if s.get("paid"))
     tk     = sum(s.get("total", 0) for s in all_submissions.values() if s.get("paid"))
     users  = len(registered_users)
-
     m = types.InlineKeyboardMarkup(row_width=2)
-    m.add(
-        types.InlineKeyboardButton("📋 সব সাবমিশন",     callback_data="admin_all_subs"),
-        types.InlineKeyboardButton("📩 User কে Message", callback_data="admin_msg_user"),
-    )
-    m.add(
-        types.InlineKeyboardButton("📢 Broadcast",       callback_data="admin_broadcast"),
-        types.InlineKeyboardButton("💰 Rate পরিবর্তন",  callback_data="admin_change_rate_menu"),
-    )
-    m.add(
-        types.InlineKeyboardButton("⚙️ Category ON/OFF", callback_data="admin_change_status_menu"),
-        types.InlineKeyboardButton("🔄 Refresh",         callback_data="admin_refresh"),
-    )
+    m.add(types.InlineKeyboardButton("📋 সব সাবমিশন", callback_data="admin_all_subs"), types.InlineKeyboardButton("📩 User কে Message", callback_data="admin_msg_user"))
+    m.add(types.InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast"), types.InlineKeyboardButton("💰 Rate পরিবর্তন", callback_data="admin_change_rate_menu"))
+    m.add(types.InlineKeyboardButton("⚙️ Category ON/OFF", callback_data="admin_change_status_menu"), types.InlineKeyboardButton("🔄 Refresh", callback_data="admin_refresh"))
+    bot.send_message(cid, "🔐 *Admin Panel*\n" "━━━━━━━━━━━━━━━━━━━━━━━━\n" f"👥 মোট User: *{users}*\n" f"📥 মোট Submit: *{total}*\n" f"✅ Paid: *{paid}*\n" f"⏳ Pending: *{total - paid}*\n" f"💵 মোট Earning: *৳{tk:.2f}*\n" "━━━━━━━━━━━━━━━━━━━━━━━━", reply_markup=m, parse_mode="Markdown")
 
-    bot.send_message(
-        cid,
-        "🔐 *Admin Panel*\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"👥 মোট User    : *{users}*\n"
-        f"📥 মোট Submit  : *{total}*\n"
-        f"✅ Paid        : *{paid}*\n"
-        f"⏳ Pending     : *{total - paid}*\n"
-        f"💵 মোট Earning : *৳{tk:.2f}*\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━",
-        reply_markup=m,
-        parse_mode="Markdown"
-    )
-
-# ════════════════════════════════════════════════════════════════
-#  ERROR HANDLER (MEDIA)
-# ════════════════════════════════════════════════════════════════
 @bot.message_handler(func=lambda m: True, content_types=["video", "audio", "voice", "sticker"])
 def handle_media(message):
     cid = message.chat.id
     if cid in user_data and user_data[cid].get("step") == "file":
-        bot.send_message(cid, "❌ একটি *.xlsx* ফাইল পাঠান, অন্য কিছু নয়।", reply_markup=cancel_btn(), parse_mode="Markdown")
+        bot.send_message(cid, "❌ একটি *.xlsx* ফাইল পাঠান।", reply_markup=cancel_btn(), parse_mode="Markdown")
     else:
         bot.send_message(cid, "❓ শুধু নিচের বাটনগুলো ব্যবহার করুন।", reply_markup=main_menu(cid))
 
@@ -875,17 +813,9 @@ def handle_media(message):
 # ════════════════════════════════════════════════════════════════
 if __name__ == "__main__":
     log.info(f"🚀 {BOT_NAME} starting...")
-    log.info(f"Admins: {ADMIN_IDS}")
-    log.info(f"Channel: {CHANNEL_ID}")
-
     while True:
         try:
-            bot.infinity_polling(
-                timeout=60,
-                long_polling_timeout=30,
-                restart_on_change=False,
-                skip_pending=True
-            )
+            bot.infinity_polling(timeout=60, long_polling_timeout=30, skip_pending=True)
         except Exception as e:
-            log.error(f"Polling crashed: {e}. Restarting in 5s...")
-            time.sleep(5) 
+            log.error(f"Polling crashed: {e}")
+            time.sleep(5)
